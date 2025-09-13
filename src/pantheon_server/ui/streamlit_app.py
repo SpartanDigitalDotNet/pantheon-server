@@ -396,7 +396,7 @@ class PantheonUI:
         - 🎨 Streamlit (Web UI)
         - 🪙 Coinbase Advanced Trade API (Market data)
         
-        For more information, visit the [GitHub repository](https://github.com/your-repo).
+        For more information, visit the [GitHub repository](https://github.com/SpartanDigital/pantheon-server).
         """)
     
     def _display_market_overview(self, overview: Dict):

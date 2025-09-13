@@ -34,9 +34,9 @@ dev = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/SpartanDigitalDotNet/pantheon-server"
-"Repository" = "https://github.com/SpartanDigitalDotNet/pantheon-server.git"
-"Issues" = "https://github.com/SpartanDigitalDotNet/pantheon-server/issues"
+"Homepage" = "https://github.com/SpartanDigital/pantheon-server"
+"Repository" = "https://github.com/SpartanDigital/pantheon-server.git"
+"Issues" = "https://github.com/SpartanDigital/pantheon-server/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]
