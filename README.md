@@ -307,3 +307,5 @@ MIT License - see LICENSE file for details
 ---
 
 **Built with the pantheon-legends framework for comprehensive cryptocurrency market analysis** 🏛️📊
+
+<!-- Discord webhook test: 2025-09-13 -->
