@@ -67,7 +67,7 @@ Transform raw cryptocurrency market data into actionable trading insights using 
 
 ```bash
 # Clone the repository
-git clone https://github.com/SpartanDigital/pantheon-server.git
+git clone https://github.com/SpartanDigitalDotNet/pantheon-server.git
 cd pantheon-server
 
 # Create virtual environment
