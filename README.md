@@ -271,6 +271,22 @@ pip install -r requirements.txt
 - Streamlit auto-refreshes on file changes
 - Use Market Overview for quick market sentiment analysis
 
+## 📢 Stay Updated
+
+### Real-time Development Updates
+Join our Discord community to stay on top of all development progress and updates:
+
+- **📊 Discord Channel**: [#pantheon-server-updates](https://discord.com/channels/1408828331176235050/1416543629769445486)
+- **🔔 Automatic Notifications**: Live commit notifications, releases, and development milestones
+- **🏛️ Repository**: Real-time updates from this GitHub repository
+- **💬 Community**: Connect with other developers and traders using Pantheon
+
+### GitHub Integration
+- **🔍 Issues**: [Report bugs or request features](https://github.com/SpartanDigitalDotNet/pantheon-server/issues)
+- **🚀 Pull Requests**: Contribute code improvements and new features
+- **📋 Releases**: Watch for new versions and feature announcements
+- **⭐ Star the Repository**: Show your support and stay notified of major updates
+
 ## Contributing
 
 1. Fork the repository
