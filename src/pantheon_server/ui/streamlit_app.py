@@ -138,15 +138,66 @@ class PantheonUI:
         col1, col2 = st.columns(2)
         
         with col1:
-            # Product selection
-            popular_pairs = st.session_state.coinbase_service.get_popular_crypto_pairs()
+            # Product selection options
+            st.subheader("Trading Pair Selection")
             
-            product_id = st.selectbox(
-                "Select Trading Pair",
-                options=popular_pairs,
-                index=0
+            # Selection method
+            selection_method = st.radio(
+                "Choose pair selection method:",
+                ["Popular Pairs", "Custom Pair"],
+                horizontal=True
             )
             
+            if selection_method == "Popular Pairs":
+                # Original popular pairs dropdown
+                popular_pairs = st.session_state.coinbase_service.get_popular_crypto_pairs()
+                
+                product_id = st.selectbox(
+                    "Select Trading Pair",
+                    options=popular_pairs,
+                    index=0,
+                    key="popular_pair_select"
+                )
+            
+            else:  # Custom Pair
+                # User-defined pair entry
+                st.markdown("**Enter Custom Trading Pair:**")
+                
+                col_symbol, col_quote = st.columns([2, 1])
+                
+                with col_symbol:
+                    symbol = st.text_input(
+                        "Symbol (e.g., BTC, ETH, DOGE)",
+                        value="BTC",
+                        placeholder="Enter cryptocurrency symbol",
+                        help="Enter the cryptocurrency symbol (base currency)"
+                    ).upper().strip()
+                
+                with col_quote:
+                    quote_currency = st.selectbox(
+                        "Quote Currency",
+                        options=["USD", "USDC"],
+                        index=0,
+                        help="Select the quote currency"
+                    )
+                
+                # Construct the product_id
+                if symbol:
+                    product_id = f"{symbol}-{quote_currency}"
+                    st.info(f"🎯 **Trading Pair:** {product_id}")
+                    
+                    # Validation message
+                    if len(symbol) < 2:
+                        st.warning("⚠️ Please enter a valid cryptocurrency symbol (at least 2 characters)")
+                    elif not symbol.isalpha():
+                        st.warning("⚠️ Symbol should contain only letters")
+                    else:
+                        st.success(f"✅ Ready to analyze {product_id}")
+                else:
+                    product_id = "BTC-USD"  # Default fallback
+                    st.warning("⚠️ Please enter a cryptocurrency symbol")
+            
+            # Analysis engine selection
             legend_type = st.selectbox(
                 "Analysis Engine",
                 options=[LegendType.TRADITIONAL, LegendType.SCANNER],
@@ -173,6 +224,15 @@ class PantheonUI:
                 st.warning("Please select at least one timeframe")
                 return
             
+            # Additional validation for custom pairs
+            if selection_method == "Custom Pair":
+                if len(symbol) < 2:
+                    st.error("❌ Please enter a valid cryptocurrency symbol (at least 2 characters)")
+                    return
+                elif not symbol.isalpha():
+                    st.error("❌ Symbol should contain only letters")
+                    return
+            
             with st.spinner(f"Analyzing {product_id}..."):
                 try:
                     results = asyncio.run(
@@ -189,7 +249,21 @@ class PantheonUI:
                     st.session_state.analysis_product_id = product_id
                     
                 except Exception as e:
-                    st.error(f"Analysis failed: {e}")
+                    error_msg = str(e).lower()
+                    if "not found" in error_msg or "404" in error_msg:
+                        st.error(f"❌ **Trading pair '{product_id}' not found on Coinbase**")
+                        st.info("💡 **Suggestions:**")
+                        st.markdown("""
+                        - Check if the symbol is correct (e.g., BTC, ETH, DOGE)
+                        - Try a different quote currency (USD vs USDC)
+                        - Use 'Popular Pairs' to see available options
+                        - Some newer or less popular tokens may not be available
+                        """)
+                    elif "rate limit" in error_msg or "429" in error_msg:
+                        st.error("⏰ **Rate limit exceeded** - please wait a moment and try again")
+                    else:
+                        st.error(f"❌ **Analysis failed:** {e}")
+                        st.info("💡 Try using a different trading pair or check your internet connection")
         
         # Display analysis results if they exist in session state
         if hasattr(st.session_state, 'analysis_results') and st.session_state.analysis_results:
