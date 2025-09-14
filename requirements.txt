@@ -25,6 +25,9 @@ loguru==0.7.2
 # Environment and configuration
 python-dotenv==1.0.0
 
+# Caching and data storage
+redis>=5.0.0
+
 # Development dependencies
 pytest==7.4.3
 pytest-asyncio==0.21.1

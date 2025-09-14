@@ -16,7 +16,7 @@ from legends import LegendType, Pantheon
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
-from ..services import CoinbaseService, PantheonMarketAnalyzer
+from ..services import CoinbaseService, PantheonMarketAnalyzer, RedisService
 
 # Load environment variables
 load_dotenv()
@@ -24,6 +24,7 @@ load_dotenv()
 # Initialize services
 coinbase_service = CoinbaseService()
 market_analyzer = PantheonMarketAnalyzer(coinbase_service)
+redis_service = RedisService()
 
 app = FastAPI(
     title="Pantheon Server",
@@ -49,6 +50,7 @@ class AnalysisRequest(BaseModel):
     legend_type: LegendType = LegendType.TRADITIONAL
     timeframes: Optional[List[str]] = ["5m", "15m", "1h"]
     max_candles: int = 200
+    force_refresh: bool = False  # New field for cache bypass
 
 
 class ScanRequest(BaseModel):
@@ -56,6 +58,7 @@ class ScanRequest(BaseModel):
     legend_type: LegendType = LegendType.SCANNER
     timeframe: str = "5m"
     max_candles: int = 100
+    force_refresh: bool = False  # New field for cache bypass
 
 
 @app.get("/")
@@ -84,13 +87,20 @@ async def root() -> Dict[str, str]:
 
 @app.get("/health")
 async def health_check() -> Dict[str, str]:
-    """Health check endpoint for monitoring"""
+    """Health check endpoint for monitoring including Redis status"""
+    try:
+        redis_health = redis_service.health_check()
+        redis_status = redis_health.get("status", "unknown")
+    except Exception:
+        redis_status = "unavailable"
+    
     return {
-        "status": "healthy",
+        "status": "healthy" if redis_status == "healthy" else "degraded",
         "timestamp": datetime.utcnow().isoformat(),
         "service": "pantheon-server",
         "pantheon_legends": "connected",
-        "coinbase_api": "available"
+        "coinbase_api": "available",
+        "redis_cache": redis_status
     }
 
 
@@ -137,19 +147,72 @@ async def get_products() -> Dict:
 
 @app.post("/analyze")
 async def analyze_crypto(request: AnalysisRequest) -> Dict:
-    """Analyze a cryptocurrency pair using specified engine and timeframes"""
+    """Analyze a cryptocurrency pair using specified engine and timeframes with Redis caching"""
     try:
-        result = await market_analyzer.analyze_crypto_pair(
+        cache_status = "miss"
+        cache_age_seconds = 0
+        results = {}
+        
+        # Check if force refresh is requested
+        if not request.force_refresh:
+            # Try to get cached results for each timeframe
+            for timeframe in request.timeframes:
+                cached_result = redis_service.get_cached_analysis(
+                    product_id=request.product_id,
+                    timeframe=timeframe,
+                    legend_type=request.legend_type.value
+                )
+                
+                if cached_result:
+                    # Calculate cache age
+                    cache_time = datetime.fromisoformat(cached_result['cached_at'])
+                    cache_age = datetime.utcnow() - cache_time
+                    cache_age_seconds = cache_age.total_seconds()
+                    
+                    # Remove cache metadata from result
+                    clean_result = {k: v for k, v in cached_result.items() 
+                                  if k not in ['cached_at', 'cache_key']}
+                    results[timeframe] = clean_result
+                    cache_status = "hit"
+        
+        # If we have cached results for all timeframes, return them
+        if len(results) == len(request.timeframes) and not request.force_refresh:
+            return {
+                "success": True,
+                "request": request.dict(),
+                "results": results,
+                "cache_status": cache_status,
+                "cache_age_seconds": int(cache_age_seconds),
+                "data_freshness": "cached",
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        
+        # Otherwise, fetch fresh data
+        fresh_results = await market_analyzer.analyze_crypto_pair(
             product_id=request.product_id,
-            engine_type=request.engine_type,
+            legend_type=request.legend_type,
             timeframes=request.timeframes,
             max_candles=request.max_candles
         )
         
+        # Cache the fresh results
+        for timeframe, result in fresh_results.items():
+            redis_service.cache_analysis_result(
+                product_id=request.product_id,
+                timeframe=timeframe,
+                legend_type=request.legend_type.value,
+                result=result
+            )
+        
+        cache_status = "refreshed" if request.force_refresh else "miss"
+        
         return {
             "success": True,
             "request": request.dict(),
-            "results": result,
+            "results": fresh_results,
+            "cache_status": cache_status,
+            "cache_age_seconds": 0,
+            "data_freshness": "live",
             "timestamp": datetime.utcnow().isoformat()
         }
     
@@ -213,18 +276,56 @@ async def ema9_fakeout_analysis(product_id: str, max_candles: int = 200) -> Dict
 @app.get("/overview")
 async def market_overview(
     popular_only: bool = True,
-    legend_type: LegendType = LegendType.TRADITIONAL
+    legend_type: LegendType = LegendType.TRADITIONAL,
+    force_refresh: bool = False
 ) -> Dict:
-    """Get a comprehensive market overview across multiple cryptocurrency pairs"""
+    """Get a comprehensive market overview with Redis caching"""
     try:
+        cache_key = f"overview:{popular_only}:{legend_type.value}"
+        cache_status = "miss"
+        cache_age_seconds = 0
+        
+        # Check cache first (unless force refresh)
+        if not force_refresh:
+            cached_overview = redis_service.get(f"pantheon:cache:{cache_key}")
+            
+            if cached_overview:
+                cache_time = datetime.fromisoformat(cached_overview['cached_at'])
+                cache_age = datetime.utcnow() - cache_time
+                cache_age_seconds = cache_age.total_seconds()
+                
+                # Return cached if still fresh (10 minutes TTL)
+                if cache_age_seconds < 600:  # 10 minutes
+                    return {
+                        "success": True,
+                        "overview": cached_overview['data'],
+                        "cache_status": "hit",
+                        "cache_age_seconds": int(cache_age_seconds),
+                        "data_freshness": "cached",
+                        "timestamp": datetime.utcnow().isoformat()
+                    }
+        
+        # Fetch fresh overview data
         overview = await market_analyzer.get_market_overview(
             popular_pairs_only=popular_only,
             legend_type=legend_type
         )
         
+        # Cache the fresh overview
+        cache_data = {
+            "data": overview,
+            "cached_at": datetime.utcnow().isoformat()
+        }
+        redis_service.set(f"pantheon:cache:{cache_key}", cache_data, ttl=600)  # 10 minutes
+        
+        cache_status = "refreshed" if force_refresh else "miss"
+        
         return {
             "success": True,
             "overview": overview,
+            "cache_status": cache_status,
+            "cache_age_seconds": 0,
+            "data_freshness": "live",
             "timestamp": datetime.utcnow().isoformat()
         }
     
@@ -286,6 +387,120 @@ async def get_candles(
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Candles fetch failed: {str(e)}")
+
+
+# === Cache Management Endpoints ===
+
+@app.get("/cache/health")
+async def cache_health() -> Dict:
+    """Get Redis cache health and statistics"""
+    try:
+        health = redis_service.health_check()
+        stats = redis_service.get_cache_stats()
+        
+        return {
+            "success": True,
+            "redis_health": health,
+            "cache_statistics": stats,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+
+@app.delete("/cache/analysis/{product_id}")
+async def clear_analysis_cache(product_id: str) -> Dict:
+    """Clear analysis cache for a specific product"""
+    try:
+        deleted_count = redis_service.clear_analysis_cache(product_id)
+        
+        return {
+            "success": True,
+            "message": f"Cleared analysis cache for {product_id}",
+            "deleted_keys": deleted_count,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Cache clear failed: {str(e)}")
+
+
+@app.delete("/cache/overview")
+async def clear_overview_cache() -> Dict:
+    """Clear market overview cache"""
+    try:
+        # Clear overview cache keys
+        overview_keys = [
+            "pantheon:cache:overview:True:traditional",
+            "pantheon:cache:overview:True:scanner", 
+            "pantheon:cache:overview:False:traditional",
+            "pantheon:cache:overview:False:scanner"
+        ]
+        
+        deleted_count = 0
+        for key in overview_keys:
+            if redis_service.delete(key):
+                deleted_count += 1
+        
+        return {
+            "success": True,
+            "message": "Cleared market overview cache",
+            "deleted_keys": deleted_count,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Cache clear failed: {str(e)}")
+
+
+@app.delete("/cache/all")
+async def clear_all_cache() -> Dict:
+    """Clear all pantheon cache (use with caution)"""
+    try:
+        analysis_deleted = redis_service.clear_analysis_cache()
+        market_deleted = redis_service.clear_market_cache()
+        
+        # Clear general cache
+        general_keys = redis_service.redis_client.keys("pantheon:cache:*")
+        general_deleted = 0
+        if general_keys:
+            general_deleted = redis_service.redis_client.delete(*general_keys)
+        
+        total_deleted = analysis_deleted + market_deleted + general_deleted
+        
+        return {
+            "success": True,
+            "message": "Cleared all pantheon cache",
+            "deleted_breakdown": {
+                "analysis_keys": analysis_deleted,
+                "market_keys": market_deleted, 
+                "general_keys": general_deleted,
+                "total": total_deleted
+            },
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Cache clear failed: {str(e)}")
+
+
+@app.post("/analyze/{product_id}/refresh")
+async def force_analyze_refresh(product_id: str, request: AnalysisRequest) -> Dict:
+    """Force fresh analysis, bypassing cache"""
+    # Override product_id and force_refresh
+    request.product_id = product_id
+    request.force_refresh = True
+    return await analyze_crypto(request)
+
+
+@app.post("/overview/refresh")
+async def force_overview_refresh(
+    popular_only: bool = True,
+    legend_type: LegendType = LegendType.TRADITIONAL
+) -> Dict:
+    """Force fresh market overview, bypassing cache"""
+    return await market_overview(popular_only=popular_only, legend_type=legend_type, force_refresh=True)
 
 
 if __name__ == "__main__":
