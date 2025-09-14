@@ -552,9 +552,108 @@ class PantheonUI:
                 st.write(f"**Legend Type Used:** {overview.get('legend_type', 'N/A')}")
                 st.write(f"**Analysis Timestamp:** {overview.get('timestamp', 'N/A')}")
     
+    def _get_tradingview_url(self, product_id: str) -> tuple:
+        """Convert trading pair to TradingView URL formats (web and mobile app)"""
+        # Convert BTC-USD to COINBASE:BTCUSD
+        symbol = product_id.replace('-', '')
+        tradingview_symbol = f"COINBASE:{symbol}"
+        
+        # Create both web and mobile app URLs
+        web_url = f"https://www.tradingview.com/chart/?symbol={tradingview_symbol}&interval=1"
+        mobile_url = f"tradingview://chart?symbol={tradingview_symbol}&interval=1"
+        
+        return web_url, mobile_url
+    
     def _display_analysis_results(self, product_id: str, results: Dict):
         """Display individual analysis results with enhanced UI"""
         st.subheader(f"Analysis Results: {product_id}")
+        
+        # TradingView integration button (Option A - top placement)
+        web_url, mobile_url = self._get_tradingview_url(product_id)
+        
+        st.markdown("### 📈 Quick Trading Actions")
+        col1, col2, col3 = st.columns([1, 1, 1])
+        
+        with col1:
+            # Web TradingView button
+            st.markdown(f"""
+                <a href="{web_url}" target="_blank" style="text-decoration: none;">
+                    <div style="
+                        background: linear-gradient(90deg, #2962FF 0%, #1E53E5 100%);
+                        color: white;
+                        padding: 12px 16px;
+                        border-radius: 8px;
+                        font-weight: 600;
+                        text-align: center;
+                        font-size: 14px;
+                        border: none;
+                        cursor: pointer;
+                        box-shadow: 0 2px 4px rgba(41, 98, 255, 0.3);
+                        transition: all 0.2s ease;
+                        display: inline-block;
+                        width: 100%;
+                        margin-bottom: 8px;
+                    ">
+                        �️ TradingView Web
+                    </div>
+                </a>
+            """, unsafe_allow_html=True)
+        
+        with col2:
+            # Mobile TradingView app button
+            st.markdown(f"""
+                <a href="{mobile_url}" style="text-decoration: none;">
+                    <div style="
+                        background: linear-gradient(90deg, #FF6B35 0%, #F7931E 100%);
+                        color: white;
+                        padding: 12px 16px;
+                        border-radius: 8px;
+                        font-weight: 600;
+                        text-align: center;
+                        font-size: 14px;
+                        border: none;
+                        cursor: pointer;
+                        box-shadow: 0 2px 4px rgba(255, 107, 53, 0.3);
+                        transition: all 0.2s ease;
+                        display: inline-block;
+                        width: 100%;
+                        margin-bottom: 8px;
+                    ">
+                        📱 TradingView App
+                    </div>
+                </a>
+            """, unsafe_allow_html=True)
+        
+        with col3:
+            # Copy symbol button for manual entry
+            symbol_only = product_id.replace('-', '')
+            st.markdown(f"""
+                <div onclick="navigator.clipboard.writeText('COINBASE:{symbol_only}').then(() => {{
+                    this.innerHTML = '✅ Copied!';
+                    setTimeout(() => this.innerHTML = '📋 Copy Symbol', 2000);
+                }})" style="
+                    background: linear-gradient(90deg, #28A745 0%, #20C997 100%);
+                    color: white;
+                    padding: 12px 16px;
+                    border-radius: 8px;
+                    font-weight: 600;
+                    text-align: center;
+                    font-size: 14px;
+                    border: none;
+                    cursor: pointer;
+                    box-shadow: 0 2px 4px rgba(40, 167, 69, 0.3);
+                    transition: all 0.2s ease;
+                    display: inline-block;
+                    width: 100%;
+                    margin-bottom: 8px;
+                ">
+                    📋 Copy Symbol
+                </div>
+            """, unsafe_allow_html=True)
+        
+        # Add helpful text
+        st.caption("💡 **Web**: Opens in browser | **App**: Opens TradingView mobile app | **Copy**: Copy symbol for manual search")
+        st.markdown("---")  # Separator line
         
         # Check if we have multiple timeframes with similar data
         if len(results) > 1:
