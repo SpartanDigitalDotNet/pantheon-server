@@ -2,8 +2,8 @@
 echo 🔒 Starting Pantheon Server with Secure Configuration
 echo ==================================================
 
-REM Set Redis password environment variable
-set PANTHEON_REDIS_PASSWORD=pantheon_server**!
+REM Set Redis password environment variable - CHANGE THIS PASSWORD!
+set PANTHEON_REDIS_PASSWORD=YOUR_SECURE_PASSWORD_HERE
 
 echo ✅ Environment variable set: PANTHEON_REDIS_PASSWORD
 echo 🔒 Password configured from environment variable

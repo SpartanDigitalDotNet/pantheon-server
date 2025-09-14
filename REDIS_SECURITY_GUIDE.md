@@ -12,13 +12,14 @@ The Redis service will check for passwords in this order:
 
 ## Development Setup (Current)
 
-For local development, the password is currently in the `.env` file:
+For local development, the password should be set via environment variable:
 
 ```env
-REDIS_PASSWORD=pantheon_server**!
+# Password should be set via PANTHEON_REDIS_PASSWORD environment variable
+# Do not store passwords in .env file for security
 ```
 
-**⚠️ Security Note**: This approach is acceptable for local development but should not be used in production.
+**⚠️ Security Note**: Never store passwords in version-controlled files.
 
 ## Production Setup (Recommended)
 
