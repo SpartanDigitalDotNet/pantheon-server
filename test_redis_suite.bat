@@ -2,8 +2,9 @@
 echo Running Complete Redis Cache Test Suite
 echo ==========================================
 
-rem Set the Redis password environment variable - CHANGE THIS PASSWORD!
-set PANTHEON_REDIS_PASSWORD=YOUR_TEST_PASSWORD_HERE
+REM Check if environment variable is set (batch file may not see PowerShell session vars)
+echo Checking environment variable...
+echo PANTHEON_REDIS_PASSWORD: %PANTHEON_REDIS_PASSWORD%
 
 echo Environment configured for testing
 echo.

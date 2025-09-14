@@ -16,10 +16,10 @@ from legends import LegendType, Pantheon
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
-from ..services import CoinbaseService, PantheonMarketAnalyzer, RedisService
-
-# Load environment variables
+# Load environment variables FIRST
 load_dotenv()
+
+from ..services import CoinbaseService, PantheonMarketAnalyzer, RedisService
 
 # Initialize services
 coinbase_service = CoinbaseService()

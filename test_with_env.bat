@@ -2,10 +2,15 @@
 echo 🧪 Testing Secure Redis Cache with Environment Variables
 echo ==================================================
 
-rem Set the Redis password environment variable - CHANGE THIS PASSWORD!
-set PANTHEON_REDIS_PASSWORD=YOUR_TEST_PASSWORD_HERE
+REM Check if environment variable is set
+if "%PANTHEON_REDIS_PASSWORD%"=="" (
+    echo ERROR: PANTHEON_REDIS_PASSWORD environment variable is not set
+    echo Please set it with: $env:PANTHEON_REDIS_PASSWORD="your_password"
+    echo Exiting...
+    exit /b 1
+)
 
-echo Environment variable set: PANTHEON_REDIS_PASSWORD=***
+echo Environment variable configured externally
 
 echo.
 echo Running test script...

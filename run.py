@@ -40,6 +40,24 @@ def start_api():
     env = os.environ.copy()
     env["PYTHONPATH"] = str(Path("src").absolute())
     
+    # Ensure Redis password is available in subprocess
+    redis_password = os.getenv("PANTHEON_REDIS_PASSWORD") or os.getenv("REDIS_PASSWORD")
+    
+    # If not found in environment, try Windows registry
+    if not redis_password:
+        try:
+            import winreg
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment") as key:
+                redis_password, _ = winreg.QueryValueEx(key, "PANTHEON_REDIS_PASSWORD")
+        except (ImportError, OSError, FileNotFoundError):
+            pass
+    
+    if redis_password:
+        env["PANTHEON_REDIS_PASSWORD"] = redis_password
+        print("🔒 Redis password configured from environment")
+    else:
+        print("⚠️  Warning: No Redis password found in environment variables")
+    
     cmd = [
         python_exe, "-m", "uvicorn",
         "pantheon_server.api.main:app",

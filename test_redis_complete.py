@@ -38,6 +38,16 @@ def test_environment_variables():
     pantheon_pass = os.getenv('PANTHEON_REDIS_PASSWORD')
     redis_pass = os.getenv('REDIS_PASSWORD')
     
+    # If not found in environment, try Windows registry (like the server does)
+    if not pantheon_pass:
+        try:
+            import winreg
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment") as key:
+                pantheon_pass, _ = winreg.QueryValueEx(key, "PANTHEON_REDIS_PASSWORD")
+                print_info("Retrieved password from Windows registry")
+        except (ImportError, OSError, FileNotFoundError):
+            pass
+    
     if pantheon_pass:
         print_success(f"PANTHEON_REDIS_PASSWORD: Set ({len(pantheon_pass)} chars)")
     else:
