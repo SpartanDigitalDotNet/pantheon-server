@@ -1,5 +1,5 @@
 # Core dependencies
-pantheon-legends==0.3.0
+pantheon-legends==0.4.0
 
 # Web frameworks
 fastapi==0.104.1
